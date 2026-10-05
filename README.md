@@ -24,6 +24,27 @@ and exports reporting tables for Tableau Public.
 
 ![2025 dataset at a glance](docs/images/data_quality_summary.png)
 
+## Analytics Figures
+
+The following figures are generated from the project's exported PostgreSQL
+analytics CSVs. They show actual descriptive results from the 2025 dataset,
+not placeholder charts.
+
+![2025 analytics dashboard](docs/images/analytics_dashboard.png)
+
+![Monthly average AQI by city](docs/images/monthly_aqi_by_city.png)
+
+### Selected Verified Results
+
+- Los Angeles has the highest annual average AQI in the exported city summary:
+  **77.39**.
+- Los Angeles also has the highest annual average PM2.5 value:
+  **23.66**.
+- The city summary includes each city's maximum AQI, hours above AQI 100, and
+  percentage of hours above AQI 100.
+- The analytics exports contain monthly AQI trends, hourly AQI patterns, and
+  AQI category totals for comparison across cities.
+
 ## What This Project Answers
 
 The SQL analysis layer is designed to explore questions such as:
@@ -167,8 +188,9 @@ The analysis script demonstrates:
 **Dashboard visualization layer in progress.**
 
 The repository includes the data-export layer needed to prepare Tableau Public
-inputs, but it does not currently contain a completed Tableau workbook or
-dashboard screenshot.
+inputs. The analytics figures above are generated with Matplotlib from those
+exported datasets; the repository does not currently contain a completed
+Tableau workbook or Tableau dashboard screenshot.
 
 The exporter prepares:
 
@@ -324,7 +346,8 @@ python -m src.load.export_tableau
 ```
 
 CSV exports are written to `data/tableau/` and are intentionally ignored by
-Git.
+Git. The committed Matplotlib figures in `docs/images/` provide a static
+portfolio presentation of the exported analytics.
 
 ## Skills Demonstrated
 
