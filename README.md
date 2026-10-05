@@ -1,47 +1,48 @@
 # Weather & Air Quality Analytics Pipeline
 
-An end-to-end analytics engineering project that extracts historical weather
-and air-quality data from Open-Meteo, transforms and validates 70,080 hourly
-observations, loads them into PostgreSQL, analyzes environmental patterns with
-SQL, and exports reporting datasets for Tableau Public.
+An end-to-end Python and PostgreSQL analytics pipeline for collecting,
+transforming, validating, and analyzing hourly weather and air-quality data
+across eight U.S. cities.
 
-![Pipeline Architecture](docs/images/pipeline_architecture.png)
+The project uses the Open-Meteo Weather and Air Quality APIs, combines the
+responses into an analytics-ready dataset, loads the result into PostgreSQL,
+and exports reporting tables for Tableau Public.
 
-## Project Highlights
+![Pipeline architecture](docs/images/pipeline_architecture.png)
 
-| Metric | Result |
+## Project Snapshot
+
+| Measure | Result |
 | --- | ---: |
+| Historical period | January 1 through December 31, 2025 |
 | Hourly observations | **70,080** |
-| U.S. cities | **8** |
-| Days of coverage | **365** |
-| Final analytical fields | **22** |
+| Cities | **8** |
+| Hours per city | **8,760** |
+| Final dataset fields | **22** |
 | Duplicate city/timestamp keys | **0** |
 | Missing values after transformation | **0** |
 
-## Business & Analytical Purpose
+![2025 dataset at a glance](docs/images/data_quality_summary.png)
 
-The pipeline supports comparisons of air quality across major U.S. cities and
-over time. The analysis examines:
+## What This Project Answers
 
-- How AQI and PM2.5 vary by city and month
-- Which cities and city/month combinations have the highest average AQI
-- How AQI patterns differ by hour of day and day of week
-- How often cities record AQI above 100
-- The relationship between wind speed, precipitation, temperature, and air-quality measures
-- How PM2.5 and other pollutants differ geographically
+The SQL analysis layer is designed to explore questions such as:
 
-These queries describe observed patterns and associations; they do not
-establish causation.
+- How does average AQI vary across cities and months?
+- Which city/month combinations have the highest average AQI?
+- How do PM2.5 and PM10 levels compare geographically?
+- How does average AQI vary by hour of day and day of week?
+- How many hours does each city spend above AQI 100?
+- What patterns appear when observations are grouped by wind speed,
+  precipitation, or temperature?
 
-## 2025 Dataset at a Glance
+These are descriptive comparisons and associations. The project does not
+claim that weather variables cause changes in air quality.
 
-![2025 Dataset at a Glance](docs/images/data_quality_summary.png)
+## Data Coverage
 
-The historical dataset covers **2025-01-01 00:00 through 2025-12-31 23:00**
-at hourly granularity. It contains 8 cities × 8,760 hours = **70,080
-observations**, with `city` + `timestamp` as the observation key.
-
-Cities:
+The historical dataset contains one hourly observation for each configured
+city and timestamp:
 
 - Salt Lake City
 - Denver
@@ -52,97 +53,92 @@ Cities:
 - Houston
 - Phoenix
 
-## Tableau Dashboard
+The expected coverage is:
 
-**Dashboard visualization layer in progress.**
+```text
+8 cities × 8,760 hours = 70,080 observations
+2025-01-01 00:00:00 through 2025-12-31 23:00:00
+```
 
-The repository includes a reproducible PostgreSQL-to-CSV export layer for
-Tableau Public. Planned dashboard views include:
+The observation key is `city` + `timestamp`.
 
-- Average AQI by city
-- Monthly average AQI by city
-- AQI category distribution
-- Wind speed vs. average AQI
-- Average AQI by hour of day
-- Average PM2.5 by city
-- Average AQI, maximum AQI, average PM2.5, and hours with AQI > 100 KPIs
+## Pipeline Architecture
 
-<!-- Add final Tableau dashboard screenshot here after dashboard completion. -->
+1. **Extract** — Historical weather data is retrieved from the Open-Meteo
+   Archive API and historical air-quality data from the Open-Meteo Air Quality
+   API. Raw responses are stored as JSON files by city.
+2. **Transform** — The JSON hourly arrays are converted to Pandas DataFrames,
+   combined by source, merged by city and timestamp, cleaned, sorted, and
+   enriched with date, year, month, day, hour, and day-of-week fields.
+3. **Validate** — The processed CSV is checked for schema completeness, city
+   coverage, timestamp validity, date bounds, duplicate keys, valid humidity
+   and cloud-cover ranges, non-negative measurements, and missing values.
+4. **Load** — Validated records are inserted into PostgreSQL with a unique
+   `(city, timestamp)` constraint and an idempotent `ON CONFLICT DO NOTHING`
+   rule.
+5. **Analyze** — PostgreSQL queries and reusable views provide geographic,
+   monthly, daily, hourly, weekday, category, and weather-group analysis.
+6. **Export** — The table and analytics views are exported to CSV files for
+   Tableau Public.
 
-## Tech Stack
+## Repository Implementation
 
-| Technology | Purpose |
+| Stage | Implementation |
 | --- | --- |
-| Python | Pipeline orchestration and data processing |
-| Pandas | Tabular transformation and CSV handling |
-| Requests | Open-Meteo API requests |
-| PostgreSQL | Analytics storage and query layer |
-| SQL | Analysis and reusable analytics views |
-| psycopg2-binary | PostgreSQL connectivity and bulk inserts |
-| python-dotenv | Environment-based database configuration |
-| Tableau Public | Planned dashboard visualization layer |
-| Git / GitHub | Version control and project hosting |
+| Location configuration | `src/config/locations.py` |
+| Historical weather extraction | `src/extract/extract_historical.py` |
+| Historical air-quality extraction | `src/extract/extract_historical_air_quality.py` |
+| JSON-to-table transformation | `src/transform/transform_historical.py` |
+| Data-quality validation | `src/validation/validate_data.py` |
+| PostgreSQL loading and verification | `src/load/load_postgres.py` |
+| Tableau CSV export | `src/load/export_tableau.py` |
+| PostgreSQL table and indexes | `sql/schema/create_tables.sql` |
+| Analytics views | `sql/schema/create_analytics_views.sql` |
+| SQL analysis | `sql/analysis/weather_air_quality_analysis.sql` |
 
-## How the Pipeline Works
+## Data Quality Checks
 
-1. **Extract** — `src/extract/extract_historical.py` retrieves hourly weather
-   observations from the Open-Meteo Archive API, while
-   `src/extract/extract_historical_air_quality.py` retrieves hourly air-quality
-   observations from the Open-Meteo Air Quality API. Each city response is
-   saved as raw JSON under `data/raw/`.
-2. **Transform** — `src/transform/transform_historical.py` converts hourly
-   JSON arrays into DataFrames, merges weather and air quality by city and
-   timestamp, removes invalid timestamps and exact duplicate rows, adds
-   date/time features, and writes `data/processed/weather_air_quality_2025.csv`.
-3. **Validate** — `src/validation/validate_data.py` checks the required
-   schema, configured cities, unique city/timestamp keys, valid timestamps,
-   complete 2025 endpoints, humidity and cloud-cover ranges, and
-   non-negative measurements. It also reports missing values and rows by city.
-4. **Load** — `src/load/load_postgres.py` inserts the processed data into
-   `weather_air_quality` with an idempotent `ON CONFLICT (city, timestamp)`
-   rule, then verifies row counts, city count, timestamp bounds, and duplicate
-   keys.
-5. **Analyze** — `sql/analysis/weather_air_quality_analysis.sql` contains
-   city, monthly, hourly, weekday, AQI-category, weather-group, ranking,
-   month-over-month, and worst-day analyses using aggregations, `FILTER`,
-   `CASE`, CTEs, `RANK()`, `ROW_NUMBER()`, and `LAG()`.
-6. **Visualize** — `src/load/export_tableau.py` exports the fact table and
-   analytics views to CSV files in `data/tableau/` for Tableau Public.
+`src/validation/validate_data.py` implements the following checks:
 
-## Data Quality & Validation
-
-The validation module implements these checks:
-
-- All 22 required columns exist
-- All configured cities are present and no unexpected cities appear
-- `city` + `timestamp` is unique
+- All 22 required columns are present
+- All configured cities are present, with no unexpected cities
+- `city` + `timestamp` values are unique
 - Timestamps parse successfully
-- The dataset begins at `2025-01-01 00:00:00` and ends at
-  `2025-12-31 23:00:00`
-- Relative humidity and cloud cover remain between 0 and 100
-- Precipitation, wind speed, PM2.5, PM10, carbon monoxide, nitrogen dioxide,
-  sulphur dioxide, ozone, and U.S. AQI are non-negative
-- Missing values are reported by column before loading
+- The dataset starts at `2025-01-01 00:00:00`
+- The dataset ends at `2025-12-31 23:00:00`
+- Relative humidity is between 0 and 100
+- Cloud cover is between 0 and 100
+- Precipitation is non-negative
+- Wind speed is non-negative
+- PM2.5, PM10, carbon monoxide, nitrogen dioxide, sulphur dioxide,
+  ozone, and U.S. AQI are non-negative
+- Missing values are reported by column
 
-The transformed project output records 70,080 rows, 22 columns, zero
-duplicate city/timestamp keys, and zero missing values.
+The transformation summary reports row count, field count, city count,
+timestamp bounds, duplicate city/timestamp keys, total missing values, and
+rows by city.
 
 ## PostgreSQL Analytics Layer
 
-`sql/schema/create_tables.sql` creates the `weather_air_quality` table with:
+The main table is `weather_air_quality`. The schema includes:
 
-- A `BIGSERIAL` primary key
-- 22 loaded analytical fields plus the generated database `id`
+- A generated `BIGSERIAL` primary key
+- Weather measurements
+- Air-quality measurements
+- Derived calendar fields
 - A unique constraint on `(city, timestamp)`
-- Range checks for humidity, cloud cover, non-negative measurements, and
-  calendar fields
-- Indexes on city, timestamp, city/timestamp, AQI, and date
+- Indexes for city, timestamp, city/timestamp, AQI, and date filtering
+- Database-level checks for valid ranges and non-negative measurements
 
-The loader reads `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD`
-from `.env`. After loading, it checks expected row counts, city coverage,
-timestamp bounds, and duplicate keys.
+The loader reads PostgreSQL settings from environment variables, verifies that
+the destination table exists, inserts the processed records, and checks:
 
-`sql/schema/create_analytics_views.sql` defines these reusable views:
+- Expected and actual row counts
+- Number of cities
+- Minimum and maximum timestamps
+- Duplicate city/timestamp keys
+
+The repository defines these analytics views:
 
 - `vw_city_air_quality_summary`
 - `vw_monthly_air_quality`
@@ -152,15 +148,54 @@ timestamp bounds, and duplicate keys.
 
 ## SQL Analysis
 
-The analysis script compares cities, months, hours, weekdays, AQI categories,
-wind-speed groups, precipitation conditions, and temperature ranges. It also
-demonstrates:
+The analysis script demonstrates:
 
-- Grouped and conditional aggregation
-- PostgreSQL `FILTER` and `CASE` expressions
-- CTE-based ranking and monthly comparisons
-- `RANK()`, `ROW_NUMBER()`, and `LAG()` window functions
-- Time-series and category analysis
+- City-level AQI, PM2.5, PM10, ozone, and observation summaries
+- Monthly and daily air-quality aggregation
+- AQI category distributions
+- Conditional aggregation with PostgreSQL `FILTER`
+- AQI threshold analysis for hours above 100
+- City ranking with `RANK()`
+- Worst-day identification with `ROW_NUMBER()`
+- Month-over-month comparison with `LAG()`
+- CTEs and window functions
+- AQI comparisons across hour, weekday, wind-speed, precipitation, and
+  temperature groups
+
+## Tableau Dashboard
+
+**Dashboard visualization layer in progress.**
+
+The repository includes the data-export layer needed to prepare Tableau Public
+inputs, but it does not currently contain a completed Tableau workbook or
+dashboard screenshot.
+
+The exporter prepares:
+
+- Hourly weather and air-quality data
+- City-level air-quality summaries
+- Monthly air-quality summaries
+- Daily air-quality summaries
+- Hourly pattern summaries
+- AQI category summaries
+
+Planned dashboard views include city AQI comparisons, monthly AQI trends, AQI
+category distributions, wind-speed comparisons, hourly patterns, PM2.5
+comparisons, and summary KPIs.
+
+## Technology Stack
+
+| Technology | Role |
+| --- | --- |
+| Python | Pipeline implementation |
+| Requests | Open-Meteo API requests |
+| Pandas | Transformation and CSV processing |
+| PostgreSQL | Relational analytics database |
+| SQL | Analysis and reusable views |
+| psycopg2-binary | PostgreSQL connectivity and inserts |
+| python-dotenv | Environment-based configuration |
+| Tableau Public | Planned reporting and visualization layer |
+| Git / GitHub | Version control and repository hosting |
 
 ## Repository Structure
 
@@ -172,6 +207,8 @@ weather-air-quality-analysis-pipeline/
 │   │   ├── air_quality/
 │   │   └── weather/
 │   └── tableau/
+├── docs/
+│   └── images/
 ├── src/
 │   ├── config/
 │   ├── extract/
@@ -184,19 +221,21 @@ weather-air-quality-analysis-pipeline/
 ├── dashboard/
 ├── notebooks/
 ├── tests/
-├── docs/
-│   └── images/
-├── requirements.txt
+├── logs/
 ├── .env.example
 ├── .gitignore
 ├── LICENSE
-└── README.md
+├── README.md
+└── requirements.txt
 ```
 
-Generated raw, processed, Tableau CSV, log, and virtual-environment files are
-ignored by Git; directory placeholders keep the expected folders visible.
+Generated raw data, processed data, Tableau CSV exports, logs, environment
+files, and virtual environments are excluded by `.gitignore`. Directory
+placeholders are retained with `.gitkeep` files.
 
-## Getting Started
+## Setup
+
+These commands use Windows PowerShell:
 
 ```powershell
 git clone https://github.com/Hypersb/weather-air-quality-analysis-pipeline.git
@@ -207,7 +246,7 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Edit `.env` with local PostgreSQL settings. Use placeholders such as:
+Edit `.env` with the local PostgreSQL connection values:
 
 ```text
 DB_HOST=localhost
@@ -217,62 +256,98 @@ DB_USER=postgres
 DB_PASSWORD=your_password_here
 ```
 
-The Open-Meteo endpoints used by this project do not require an API key.
-`.env` is ignored by Git and `.env.example` contains empty placeholders only.
+The Open-Meteo endpoints used by the extraction modules do not require an API
+key. Database credentials are loaded from `.env`, which is ignored by Git.
+`.env.example` contains placeholders only.
 
 ## Running the Pipeline
 
-Run the historical extraction modules first:
+### 1. Extract historical data
 
 ```powershell
 python -m src.extract.extract_historical
 python -m src.extract.extract_historical_air_quality
 ```
 
-Transform and validate the combined dataset:
+These commands save raw JSON files under:
+
+```text
+data/raw/weather/historical/
+data/raw/air_quality/historical/
+```
+
+### 2. Transform the historical data
 
 ```powershell
 python -m src.transform.transform_historical
+```
+
+The output is written to:
+
+```text
+data/processed/weather_air_quality_2025.csv
+```
+
+### 3. Validate the processed dataset
+
+```powershell
 python -m src.validation.validate_data
 ```
 
-Create the PostgreSQL table before the load. From a PostgreSQL installation,
-run the SQL file with `psql` (if `psql` is not on `PATH`, use the executable
-path from the local PostgreSQL installation):
+### 4. Create the PostgreSQL schema
+
+Run the schema file with `psql`:
 
 ```powershell
 psql -U postgres -d weather_air_quality_db -f sql/schema/create_tables.sql
+```
+
+If `psql` is not on `PATH`, run the `psql.exe` supplied by the local
+PostgreSQL installation.
+
+### 5. Load and verify the data
+
+```powershell
 python -m src.load.load_postgres
+```
+
+### 6. Create analytics views
+
+```powershell
 psql -U postgres -d weather_air_quality_db -f sql/schema/create_analytics_views.sql
 ```
 
-Export the table and analytics views for Tableau Public:
+### 7. Export Tableau datasets
 
 ```powershell
 python -m src.load.export_tableau
 ```
 
-The exporter writes CSV files to `data/tableau/`. These generated files are
-ignored by Git.
+CSV exports are written to `data/tableau/` and are intentionally ignored by
+Git.
 
 ## Skills Demonstrated
 
 - REST API integration
-- Python ETL and Pandas transformation
-- Data cleaning and data-quality validation
+- Python ETL development
+- Pandas data transformation
+- Data cleaning and validation
 - PostgreSQL schema design and loading
-- Analytical SQL, CTEs, conditional aggregation, and window functions
-- Reproducible reporting-dataset exports
-- Environment-based configuration and Git/GitHub workflows
+- Analytical SQL
+- CTEs and window functions
+- Reproducible reporting-data exports
+- Environment-based configuration
+- Git and GitHub workflows
 
 ## Future Improvements
 
-Potential future work, not current functionality:
+The following are potential future enhancements, not current functionality:
 
 - Scheduled pipeline execution
 - Incremental database loading
 - Expanded city coverage
-- Automated tests and CI validation
+- Automated unit and integration tests
+- Continuous integration validation
 - Cloud-hosted PostgreSQL
 - Automated Tableau refresh workflow
 
