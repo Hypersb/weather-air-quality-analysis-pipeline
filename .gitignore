@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment and secrets
+.env
+
+# IDE and editor settings
+.vscode/
+.idea/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/*.log
+
+# Generated and raw data
+/data/raw/**/*.csv
+/data/raw/**/*.json
+/data/raw/**/*.parquet
+/data/raw/**/*.xlsx
+/data/processed/**/*.csv
+/data/processed/**/*.json
+/data/processed/**/*.parquet
+/data/processed/**/*.xlsx
+
+# Keep directory placeholders tracked
+!**/.gitkeep
